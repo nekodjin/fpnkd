@@ -92,3 +92,8 @@ fn index_out_of_bounds() {
 
     mem::drop(val);
 }
+
+#[test]
+fn no_stack_overflow() {
+    mem::drop(List::from([1]).cycle().take(5_000_000));
+}

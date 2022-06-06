@@ -4,6 +4,9 @@ use std::sync;
 
 use sync::Arc;
 
+// TODO
+// use custom allocator once
+// Allocator API is stabilized
 pub struct List<T> {
     head: Option<Arc<Node<T>>>,
 }
@@ -30,9 +33,9 @@ impl<T> List<T> {
         self.head.as_ref().unwrap().val.clone()
     }
 
-    pub fn tail(self) -> Self {
+    pub fn tail(mut self) -> Self {
         Self {
-            head: self.head.unwrap().next.clone(),
+            head: self.head.take().unwrap().next.clone(),
         }
     }
 
@@ -40,11 +43,11 @@ impl<T> List<T> {
         self.prepend_shared(Arc::new(val))
     }
 
-    pub fn prepend_shared(self, val: Arc<T>) -> Self {
+    pub fn prepend_shared(mut self, val: Arc<T>) -> Self {
         Self {
             head: Some(Arc::new(Node {
                 val,
-                next: self.head,
+                next: self.head.take(),
             })),
         }
     }
@@ -68,13 +71,31 @@ impl<T> List<T> {
             };
 
             *last = Some(Arc::new(node));
-
-            last = &mut Arc::get_mut(last.as_mut().unwrap()).unwrap().next;
+            last = unsafe {
+                &mut last
+                    .as_mut()
+                    // TODO
+                    // replace with get_mut_unchecked
+                    // once it is stabilized
+                    .map(Arc::get_mut)
+                    .unwrap_unchecked()
+                    .unwrap_unchecked()
+                    .next
+            };
         }
 
         *last = Some(ls.head.clone().unwrap());
 
         list
+    }
+}
+
+impl<T> List<T>
+where
+    T: Clone,
+{
+    pub fn deep_clone(&self) -> Self {
+        self.clone().map(|x| (*x).clone()).collect()
     }
 }
 
@@ -177,18 +198,42 @@ impl<T> FromIterator<Arc<T>> for List<T> {
     where
         I: IntoIterator<Item = Arc<T>>,
     {
-        Self { head: cons(source) }
+        let mut list = Self::new();
+        let mut last = &mut list.head;
+
+        for elem in source {
+            let node = Node {
+                val: elem,
+                next: None,
+            };
+
+            *last = Arc::new(node).into();
+            last = unsafe {
+                &mut last
+                    .as_mut()
+                    // TODO
+                    // replace with get_mut_unchecked
+                    // once it is stabilized
+                    .map(Arc::get_mut)
+                    .unwrap_unchecked()
+                    .unwrap_unchecked()
+                    .next
+            };
+        }
+
+        list
     }
 }
 
-fn cons<I, T>(source: I) -> Option<Arc<Node<T>>>
-where
-    I: IntoIterator<Item = Arc<T>>,
-{
-    let mut iter = source.into_iter();
+impl<T> ops::Drop for List<T> {
+    fn drop(&mut self) {
+        let mut temp = self.head.take();
 
-    Some(Arc::new(Node {
-        val: iter.next()?,
-        next: cons(iter),
-    }))
+        while let Some(mut curr) = temp {
+            temp = match Arc::get_mut(&mut curr) {
+                Some(curr) => curr.next.take(),
+                None => return,
+            };
+        }
+    }
 }
