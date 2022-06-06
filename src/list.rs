@@ -1,3 +1,4 @@
+use std::cmp;
 use std::fmt;
 use std::ops;
 use std::sync;
@@ -237,5 +238,23 @@ impl<T> ops::Drop for Node<T> {
                 None => return,
             };
         }
+    }
+}
+
+impl<T> cmp::PartialOrd for List<T>
+where
+    T: Ord,
+{
+    fn partial_cmp(&self, rhs: &Self) -> Option<cmp::Ordering> {
+        self.cmp(rhs).into()
+    }
+}
+
+impl<T> cmp::Ord for List<T>
+where
+    T: Ord,
+{
+    fn cmp(&self, rhs: &Self) -> cmp::Ordering {
+        self.clone().cmp(rhs.clone())
     }
 }
