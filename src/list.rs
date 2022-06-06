@@ -225,9 +225,11 @@ impl<T> FromIterator<Arc<T>> for List<T> {
     }
 }
 
-impl<T> ops::Drop for List<T> {
+// custom drop prevents stack overflow
+// when freeing long lists
+impl<T> ops::Drop for Node<T> {
     fn drop(&mut self) {
-        let mut temp = self.head.take();
+        let mut temp = self.next.take();
 
         while let Some(mut curr) = temp {
             temp = match Arc::get_mut(&mut curr) {
