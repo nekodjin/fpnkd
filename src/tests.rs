@@ -95,5 +95,10 @@ fn index_out_of_bounds() {
 
 #[test]
 fn no_stack_overflow() {
-    mem::drop(List::from([1]).cycle().take(5_000_000));
+    mem::drop(
+        List::from([1])
+            .cycle()
+            .take(5_000_000)
+            .collect::<List<i32>>(),
+    );
 }
